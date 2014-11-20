@@ -26,7 +26,6 @@ exch arr i j = do
   writeArray arr j iItem
 
 -- | Selection sort, Algorithm 2.1
---   Sort 'arr' into increasing order.
 selection :: (MArray a e (ST s), Ix i, Ord e, Num i, Enum i) => a i e -> ST s ()
 selection arr = do
   (m, n) <- getBounds arr
@@ -43,7 +42,6 @@ selection arr = do
     exch arr i newInf
 
 -- | Insertion sort, Algorithm 2.2
---   Sort 'arr' into increasing order.
 insertion :: (MArray a e m, Ix i, Ord e, Num i, Enum i) => a i e -> m ()
 insertion arr = do
   (m, n) <- getBounds arr
@@ -59,7 +57,6 @@ insertion arr = do
           go (n-1)
 
 -- | Shellsort, Algorithm 2.3
---   Sort 'arr' into increasing order.
 shell :: (MArray a e (ST s), Ix i, Ord e, Integral i) => a i e -> ST s ()
 shell arr = do
   (_, n) <- getBounds arr
@@ -78,7 +75,7 @@ shell arr = do
             exch arr j (j - h)
             go h (j - h)
 
--- | For merge sort and bottom up merge sort, Algorithms 2.4a & 2.4b.
+-- | For merge sort and bottom up merge sort, Algorithms 2.4.
 --   Merge 'arr[lo..mid]' with 'arr[mid+1..hi].
 mergeAux :: (MArray a e (ST s), Ix i, Ord e, Num i, Enum i)
          => a i e -> i -> i -> i -> ST s ()
@@ -106,8 +103,7 @@ mergeAux arr lo mid hi = do
              writeArray arr k =<< readArray aux i
              writeSTRef iRef (i + 1)
              
--- | Top-down mergesort, Algorithm 2.4a
---   Sort 'arr' into increasing order.
+-- | Top-down mergesort, Algorithm 2.4
 merge :: (MArray a e (ST s), Ix i, Ord e, Integral i) => a i e -> ST s () 
 merge arr = do
   (lo, hi) <- getBounds arr
@@ -120,7 +116,7 @@ merge arr = do
         sort (m + 1) h     -- Sort right half.
         mergeAux arr l m h -- Merge results.
 
--- | Bottom-up mergesort, Algorithm 2.4b
+-- | Bottom-up mergesort.
 mergeBU :: (MArray a e (ST s), Ix i, Ord e, Num i, Enum i) => a i e -> ST s ()
 mergeBU arr = do
   (_, hi) <- getBounds arr
@@ -158,7 +154,6 @@ partition arr lo hi = do
   return =<< readSTRef jRef -- with arr[lo..j-1] <= arr[j+1..hi].
 
 -- | Quicksort, Algorithm 2.5.
---   Sort 'arr' into increasing order.
 quick :: (MArray a e (ST s), Ix i, Ord e, Num i) => a i e -> ST s ()
 quick arr = do 
   (lo, hi) <- getBounds arr
@@ -169,8 +164,44 @@ quick arr = do
       sort l (j-1)  -- Sort left part 'arr[l..j-1]'.
       sort (j+1) h  -- Sort right part 'arr[j+1..h]'.
 
+-- | Quicksort with 3-way partitioning
+quick3 :: (MArray a e (ST s), Ix i, Ord e, Num i) => a i e -> ST s ()
+quick3 arr = do
+  (lo, hi) <- getBounds arr
+  sort lo hi
+    where
+      sort l h = when (l < h) $ do
+      ltRef <- newSTRef l
+      iRef  <- newSTRef (l + 1)
+      gtRef <- newSTRef h
+      v <- readArray arr l
+      let go = do
+            i     <- readSTRef iRef
+            lt    <- readSTRef ltRef
+            gt    <- readSTRef gtRef
+            itemI <- readArray arr (min i h)
+            when (i <= gt) $ do
+              if | itemI < v -> do
+                     exch arr lt i
+                     modifySTRef' ltRef (+1)
+                     modifySTRef' iRef  (+1)
+                     go
+                 | itemI > v -> do
+                     exch arr i gt
+                     modifySTRef' gtRef (+(-1))
+                     go
+                 | otherwise -> do
+                     modifySTRef' iRef (+1)
+                     go
+      go
+      lt <- readSTRef ltRef
+      gt <- readSTRef gtRef
+      -- Now 'arr[l..lt-1] < v = arr[lt..gt] < arr[gt+1..h]'.
+      sort l (lt - 1)
+      sort (gt + 1) h
+
 main :: IO ()
 main = print $ runST $ do
   xs <- newListArray (0, 15) "MERGESORTEXAMPLE" :: (ST s (STUArray s Int Char))
-  _  <- quick xs
+  _  <- quick3 xs
   getElems xs

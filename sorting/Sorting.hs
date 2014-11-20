@@ -132,8 +132,53 @@ mergeBU arr = do
     forM_ [0, sz + sz .. hi - sz - 1] $ \i ->            -- i:  subarray index
       mergeAux arr i (i + sz - 1) (min (i + sz + sz - 1) (hi - 1)) 
 
+-- | Partition into 'arr[lo..i-1], a[+1..hi]'. For quicksort, Algorithm 2.5.
+partition :: (MArray a t (ST s), Ix b, Ord t, Num b) 
+          => a b t -> b -> b -> ST s b
+partition arr lo hi = do
+  iRef <- newSTRef lo
+  jRef <- newSTRef (hi + 1)
+  v    <- readArray arr lo
+  exch arr lo =<< while v iRef jRef
+  return =<< readSTRef jRef
+  where
+    while v0 iRef0 jRef0= do
+      setI v0 iRef0
+      setJ v0 jRef0
+      i <- readSTRef iRef0
+      j <- readSTRef jRef0
+      if (i < j)
+        then do
+          exch arr i j
+          while v0 iRef0 jRef0
+        else return j
+    setI v1 iRef1 = do
+      i' <- readSTRef iRef1
+      let i1 = i' + 1
+      writeSTRef iRef1 i1
+      itemI1 <- readArray arr i1
+      when (itemI1 < v1 && i1 <= hi) (setI v1 iRef1)
+    setJ v2 jRef2 = do
+      j' <- readSTRef jRef2
+      let j1 = j' - 1
+      writeSTRef jRef2 j1
+      itemJ1 <- readArray arr j1
+      when (v2 < itemJ1 && j1 > lo) (setJ v2 jRef2)
+
+-- | Quicksort, Algorithm 2.5.
+--   Sort 'arr' into increasing order.
+quick :: (MArray a e (ST s), Ix i, Ord e, Num i) => a i e -> ST s ()
+quick arr = do 
+  (lo, hi) <- getBounds arr
+  sort lo hi
+    where
+      sort l h = when (l < h) $ do
+      j <- partition arr l h
+      sort l (j-1)  -- Sort left part 'arr[l..j-1]'.
+      sort (j+1) h  -- Sort right part 'arr[j+1..h]'.
+
 main :: IO ()
 main = print $ runST $ do
   xs <- newListArray (0, 15) "MERGESORTEXAMPLE" :: (ST s (STUArray s Int Char))
-  _  <- mergeBU xs
+  _  <- quick xs
   getElems xs

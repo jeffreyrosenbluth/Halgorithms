@@ -27,8 +27,7 @@ exch arr i j = do
 
 -- | Selection sort, Algorithm 2.1
 --   Sort 'arr' into increasing order.
-selection :: (MArray a e (ST s), Ix i, Ord e, Num i, Enum i) 
-          => a i e -> ST s ()
+selection :: (MArray a e (ST s), Ix i, Ord e, Num i, Enum i) => a i e -> ST s ()
 selection arr = do
   (m, n) <- getBounds arr
   infRef <- newSTRef 0
@@ -45,8 +44,7 @@ selection arr = do
 
 -- | Insertion sort, Algorithm 2.2
 --   Sort 'arr' into increasing order.
-insertion :: (MArray a e m, Ix i, Ord e, Num i, Enum i) 
-          => a i e -> m ()
+insertion :: (MArray a e m, Ix i, Ord e, Num i, Enum i) => a i e -> m ()
 insertion arr = do
   (m, n) <- getBounds arr
   forM_ [m+1..n] go
@@ -62,8 +60,7 @@ insertion arr = do
 
 -- | Shellsort, Algorithm 2.3
 --   Sort 'arr' into increasing order.
-shell :: (MArray a e (ST s), Ix i, Ord e, Integral i) 
-      => a i e -> ST s ()
+shell :: (MArray a e (ST s), Ix i, Ord e, Integral i) => a i e -> ST s ()
 shell arr = do
   (_, n) <- getBounds arr
   -- 1, 4, 13, 40, 121, 364, 1093, ...
@@ -84,7 +81,7 @@ shell arr = do
 -- | For merge sort and bottom up merge sort, Algorithms 2.4a & 2.4b.
 --   Merge 'arr[lo..mid]' with 'arr[mid+1..hi].
 mergeAux :: (MArray a e (ST s), Ix i, Ord e, Num i, Enum i)
-             => a i e -> i -> i -> i -> ST s ()
+         => a i e -> i -> i -> i -> ST s ()
 mergeAux arr lo mid hi = do
     iRef <- newSTRef lo
     jRef <- newSTRef (mid + 1)
@@ -133,37 +130,32 @@ mergeBU arr = do
       mergeAux arr i (i + sz - 1) (min (i + sz + sz - 1) (hi - 1)) 
 
 -- | Partition into 'arr[lo..i-1], a[+1..hi]'. For quicksort, Algorithm 2.5.
-partition :: (MArray a t (ST s), Ix b, Ord t, Num b) 
-          => a b t -> b -> b -> ST s b
+partition :: (MArray a e (ST s), Ix i, Ord e, Num i) => a i e -> i -> i -> ST s i
 partition arr lo hi = do
-  iRef <- newSTRef lo
-  jRef <- newSTRef (hi + 1)
-  v    <- readArray arr lo
-  exch arr lo =<< while v iRef jRef
-  return =<< readSTRef jRef
-  where
-    while v0 iRef0 jRef0= do
-      setI v0 iRef0
-      setJ v0 jRef0
-      i <- readSTRef iRef0
-      j <- readSTRef jRef0
-      if (i < j)
-        then do
-          exch arr i j
-          while v0 iRef0 jRef0
-        else return j
-    setI v1 iRef1 = do
-      i' <- readSTRef iRef1
-      let i1 = i' + 1
-      writeSTRef iRef1 i1
-      itemI1 <- readArray arr i1
-      when (itemI1 < v1 && i1 <= hi) (setI v1 iRef1)
-    setJ v2 jRef2 = do
-      j' <- readSTRef jRef2
-      let j1 = j' - 1
-      writeSTRef jRef2 j1
-      itemJ1 <- readArray arr j1
-      when (v2 < itemJ1 && j1 > lo) (setJ v2 jRef2)
+  iRef <- newSTRef lo       -- left scan index
+  jRef <- newSTRef (hi + 1) -- right scan index
+  v    <- readArray arr lo  -- partioning item
+  let setI = do
+        modifySTRef' iRef (+1)
+        i' <- readSTRef iRef
+        itemI <- readArray arr i'
+        when (itemI < v && i' < hi) setI
+      setJ = do
+        modifySTRef' jRef (+(-1))
+        j' <- readSTRef jRef
+        itemJ <- readArray arr j'
+        when (v < itemJ && j' > lo) setJ
+      -- Scan rigth, scan left, check for scan complete and exchange.
+      go = do
+        setI; setJ
+        i <- readSTRef iRef
+        j <- readSTRef jRef
+        if | (i < j) -> do
+               exch arr i j
+               go
+           | otherwise -> return j
+  exch arr lo =<< go        -- Put 'v = arr[j]' into position
+  return =<< readSTRef jRef -- with arr[lo..j-1] <= arr[j+1..hi].
 
 -- | Quicksort, Algorithm 2.5.
 --   Sort 'arr' into increasing order.

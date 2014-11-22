@@ -9,9 +9,10 @@
 -- Transcription of "http://algs4.cs.princeton.edu".
 -- (c) 2014 Jeffrey Rosenbluth
 ----------------------------------------------------------
---
+
 module Sorting where
 
+import Control.Applicative
 import Control.Monad
 import Control.Monad.ST
 import Data.Array.MArray
@@ -48,23 +49,22 @@ insertion arr = do
   forM_ [m+1..n] go
     -- Insert 'arr[i]' among 'a[i-1], a[i-2], ...
     where
-      go 0 = return ()
-      go n = do
+      go n = when (n > 0) $ do
         b <- readArray arr n
         a <- readArray arr (n-1)
         when (b < a) $ do
           exch arr n (n-1)
-          go (n-1)
+          go (n-1) 
 
 -- | Shellsort, Algorithm 2.3
 shell :: (MArray a e (ST s), Ix i, Ord e, Integral i) => a i e -> ST s ()
 shell arr = do
   (_, n) <- getBounds arr
   -- 1, 4, 13, 40, 121, 364, 1093, ...
-  let hs = reverse $ takeWhile (<= n `div` 3 + 1) (iterate (\x -> 3 * x + 1) 1)
-  forM_ hs $ \h' ->
-    -- h-sort the array.
-    forM_ [h'..n] (go h')
+  let hs = reverse 
+         $ takeWhile (<= n `div` 3 + 1) 
+         $ iterate (\x -> 3 * x + 1) 1
+  forM_ hs $ \h' -> forM_ [h'..n] (go h')
     where
       -- Insert 'a[i]' among 'a[i-h], a[i-2*h], ...
       go h j = 
@@ -121,7 +121,7 @@ mergeBU :: (MArray a e (ST s), Ix i, Ord e, Num i, Enum i) => a i e -> ST s ()
 mergeBU arr = do
   (_, hi) <- getBounds arr
   -- Do log hi passes of pairwise merges.
-  forM_ (takeWhile (< hi) [2 ^ i | i <- [0..]]) $ \sz -> -- sz: subarray size
+  forM_ (takeWhile (< hi) [2 ^ i | i <- [(0 :: Int)..]]) $ \sz -> -- sz: subarray size
     forM_ [0, sz + sz .. hi - sz - 1] $ \i ->            -- i:  subarray index
       mergeAux arr i (i + sz - 1) (min (i + sz + sz - 1) (hi - 1)) 
 
@@ -185,14 +185,11 @@ quick3 arr = do
                      exch arr lt i
                      modifySTRef' ltRef (+1)
                      modifySTRef' iRef  (+1)
-                     go
                  | itemI > v -> do
                      exch arr i gt
                      modifySTRef' gtRef (+(-1))
-                     go
-                 | otherwise -> do
-                     modifySTRef' iRef (+1)
-                     go
+                 | otherwise -> modifySTRef' iRef (+1)
+              go
       go
       lt <- readSTRef ltRef
       gt <- readSTRef gtRef
@@ -200,8 +197,24 @@ quick3 arr = do
       sort l (lt - 1)
       sort (gt + 1) h
 
+sink :: (MArray a e m, Ix i, Ord e, Num i) => a i e -> i -> i -> m ()
+sink = undefined
+
+heap :: (MArray a e m, Ix i, Ord e, Integral i) => a i e -> m ()
+heap arr = do
+  (_, n) <- getBounds arr
+  let m = (n - 1) `div` 2
+  forM_ [m, m-1..0]  $ \k -> sink arr k n
+  go n
+    where
+      go q = when (q > 0) $ do
+        let q1 = q - 1
+        exch arr 0 q
+        sink arr 0 q1
+        go q1
+      
 main :: IO ()
 main = print $ runST $ do
   xs <- newListArray (0, 15) "MERGESORTEXAMPLE" :: (ST s (STUArray s Int Char))
-  _  <- quick3 xs
+  _  <- heap xs
   getElems xs

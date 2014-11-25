@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiWayIf       #-}
+{-# LANGUAGE TypeFamilies     #-}
 
 ----------------------------------------------------------
 -- |
@@ -12,12 +13,16 @@
 
 module Sorting where
 
-import Control.Applicative
-import Control.Monad
-import Control.Monad.ST
-import Data.Array.MArray
-import Data.Array.ST
-import Data.STRef
+import           Control.Applicative
+import           Control.Monad
+import           Control.Monad.Primitive
+import           Control.Monad.ST
+import           Data.Array.MArray
+import           Data.STRef
+import qualified Data.Vector.Unboxed as V
+import           Data.Vector.Unboxed.Mutable (read, swap)
+import qualified Data.Vector.Unboxed.Mutable as VM
+import           Prelude hiding (read)
 
 exch :: (MArray a e m, Ix i) => a i e -> i -> i -> m ()
 exch arr i j = do
@@ -26,9 +31,9 @@ exch arr i j = do
   writeArray arr i jItem
   writeArray arr j iItem
 
--- | Selection sort, Algorithm 2.1
-selection :: (MArray a e (ST s), Ix i, Ord e, Num i, Enum i) => a i e -> ST s ()
-selection arr = do
+-- | Selection sort using arrays, Algorithm 2.1
+selectionA :: (MArray a e (ST s), Ix i, Ord e, Num i, Enum i) => a i e -> ST s ()
+selectionA arr = do
   (m, n) <- getBounds arr
   infRef <- newSTRef 0
   forM_ [m..n] $ \i -> do
@@ -42,12 +47,42 @@ selection arr = do
     newInf <- readSTRef infRef
     exch arr i newInf
 
--- | Insertion sort, Algorithm 2.2
-insertion :: (MArray a e m, Ix i, Ord e, Num i, Enum i) => a i e -> m ()
-insertion arr = do
+-- | Selection sort using vectors, Algorithm 2.1
+selectionV :: (VM.Unbox a, Ord a) => VM.MVector s a -> ST s ()
+selectionV vec = do
+  let n = VM.length vec
+  infRef <- newSTRef 0
+  forM_ [0..n-1] $ \i -> do
+    writeSTRef infRef i
+    forM_ [i+1..n-1] $ \j -> do
+      inf     <- readSTRef infRef
+      itemJ   <- read vec j
+      itemInf <- read vec inf
+      when (itemJ < itemInf) $ writeSTRef infRef j
+    newInf <- readSTRef infRef
+    swap vec i newInf
+
+vecMin :: (VM.Unbox (m a), PrimMonad ((->) (VM.MVector s (m a))), Ord (m a), Num a, Monad m,
+          PrimState ((->) (VM.MVector s (m a))) ~ s)
+       => VM.MVector s (m a) -> m a    
+vecMin vec
+  | VM.null vec = return 0
+  | otherwise = min <$> read vec 0 <*> vecMin $ VM.tail vec
+
+-- | Selection sort using vectors, Algorithm 2.1
+-- selectionV' :: (VM.Unbox a, Ord a) => VM.MVector s a -> ST s ()
+selectionV' vec = do
+  let n = VM.length vec
+  forM_ [0..n-1] $ \i -> do
+    inf <- vecMin (VM.slice (i+1) (n-1) vec)
+    swap vec i inf
+
+-- | Insertion sort using arrays, Algorithm 2.2
+insertionA :: (MArray a e m, Ix i, Ord e, Num i, Enum i) => a i e -> m ()
+insertionA arr = do
   (m, n) <- getBounds arr
   forM_ [m+1..n] go
-    -- Insert 'arr[i]' among 'a[i-1], a[i-2], ...
+    -- Insert 'arr[i]' among 'arr[i-1], arr[i-2], ...
     where
       go n = when (n > 0) $ do
         b <- readArray arr n
@@ -55,6 +90,20 @@ insertion arr = do
         when (b < a) $ do
           exch arr n (n-1)
           go (n-1) 
+
+-- | Insertion sort using vectors, Algorithm 2.2
+insertionV :: (VM.Unbox e, PrimMonad m, Ord e) => VM.MVector (PrimState m) e -> m ()
+insertionV vec = do
+  let n = VM.length vec
+  forM_ [1..n-1] go
+    -- Insert 'vec[i]' among 'vec[i-1], vec[i-2], ...
+    where
+      go n = when (n > 0) $ do
+        b <- read vec n
+        a <- read vec (n - 1)
+        when (b < a) $ do
+          swap vec n (n - 1)
+          go (n - 1)
 
 -- | Shellsort, Algorithm 2.3
 shell :: (MArray a e (ST s), Ix i, Ord e, Integral i) => a i e -> ST s ()
@@ -212,9 +261,16 @@ heap arr = do
         exch arr 0 q
         sink arr 0 q1
         go q1
+
+test :: [Char] -> [Char]
+test xs = V.toList $ runST $ do
+  v <- V.unsafeThaw $ V.fromList xs
+  _ <- selectionV v
+  V.unsafeFreeze v
       
 main :: IO ()
-main = print $ runST $ do
-  xs <- newListArray (0, 15) "MERGESORTEXAMPLE" :: (ST s (STUArray s Int Char))
-  _  <- heap xs
-  getElems xs
+main = print $ test "MERGESORTEXAMPLE"
+--- main = print $ runST $ do
+--   xs <- newListArray (0, 15) "MERGESORTEXAMPLE" :: (ST s (STUArray s Int Char))
+--   _  <- heap xs
+--   getElems xs

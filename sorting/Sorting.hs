@@ -19,10 +19,15 @@ import           Control.Monad.Primitive
 import           Control.Monad.ST
 import           Data.Array.MArray
 import           Data.STRef
-import qualified Data.Vector.Unboxed as V
-import           Data.Vector.Unboxed.Mutable (read, swap)
-import qualified Data.Vector.Unboxed.Mutable as VM
+import           Data.Vector (toList, fromList)
+import qualified Data.Vector.Generic as V
+import           Data.Vector.Generic.Mutable (read, write, swap, MVector)
+import qualified Data.Vector.Generic.Mutable as VM
 import           Prelude hiding (read)
+
+(.=) :: STRef s a -> a -> ST s ()
+(.=) v e = writeSTRef v e
+infix  4 .=
 
 exch :: (MArray a e m, Ix i) => a i e -> i -> i -> m ()
 exch arr i j = do
@@ -31,69 +36,23 @@ exch arr i j = do
   writeArray arr i jItem
   writeArray arr j iItem
 
--- | Selection sort using arrays, Algorithm 2.1
-selectionA :: (MArray a e (ST s), Ix i, Ord e, Num i, Enum i) => a i e -> ST s ()
-selectionA arr = do
-  (m, n) <- getBounds arr
-  infRef <- newSTRef 0
-  forM_ [m..n] $ \i -> do
-    writeSTRef infRef i
-    -- Exchange arr[i] with smallest entry in arr[i+1..n].
-    forM_ [i+1..n] $ \j -> do
-      inf     <- readSTRef infRef -- Index of minimal entry.
-      itemJ   <- readArray arr j
-      itemInf <- readArray arr inf
-      when (itemJ < itemInf) $ writeSTRef infRef j
-    newInf <- readSTRef infRef
-    exch arr i newInf
-
--- | Selection sort using vectors, Algorithm 2.1
-selectionV :: (VM.Unbox a, Ord a) => VM.MVector s a -> ST s ()
-selectionV vec = do
+-- | Selection sort, Algorithm 2.1
+selectionSort :: (Ord a, MVector v a) => v s a -> ST s ()
+selectionSort vec = do
   let n = VM.length vec
   infRef <- newSTRef 0
   forM_ [0..n-1] $ \i -> do
     writeSTRef infRef i
     forM_ [i+1..n-1] $ \j -> do
-      inf     <- readSTRef infRef
       itemJ   <- read vec j
-      itemInf <- read vec inf
+      itemInf <- read vec =<< readSTRef infRef
       when (itemJ < itemInf) $ writeSTRef infRef j
     newInf <- readSTRef infRef
     swap vec i newInf
 
-vecMin :: (VM.Unbox (m a), PrimMonad ((->) (VM.MVector s (m a))), Ord (m a), Num a, Monad m,
-          PrimState ((->) (VM.MVector s (m a))) ~ s)
-       => VM.MVector s (m a) -> m a    
-vecMin vec
-  | VM.null vec = return 0
-  | otherwise = min <$> read vec 0 <*> vecMin $ VM.tail vec
-
--- | Selection sort using vectors, Algorithm 2.1
--- selectionV' :: (VM.Unbox a, Ord a) => VM.MVector s a -> ST s ()
-selectionV' vec = do
-  let n = VM.length vec
-  forM_ [0..n-1] $ \i -> do
-    inf <- vecMin (VM.slice (i+1) (n-1) vec)
-    swap vec i inf
-
--- | Insertion sort using arrays, Algorithm 2.2
-insertionA :: (MArray a e m, Ix i, Ord e, Num i, Enum i) => a i e -> m ()
-insertionA arr = do
-  (m, n) <- getBounds arr
-  forM_ [m+1..n] go
-    -- Insert 'arr[i]' among 'arr[i-1], arr[i-2], ...
-    where
-      go n = when (n > 0) $ do
-        b <- readArray arr n
-        a <- readArray arr (n-1)
-        when (b < a) $ do
-          exch arr n (n-1)
-          go (n-1) 
-
--- | Insertion sort using vectors, Algorithm 2.2
-insertionV :: (VM.Unbox e, PrimMonad m, Ord e) => VM.MVector (PrimState m) e -> m ()
-insertionV vec = do
+-- | Insertion sort, Algorithm 2.2
+insertionSort :: (Ord a, MVector v a) => v s a -> ST s ()
+insertionSort vec = do
   let n = VM.length vec
   forM_ [1..n-1] go
     -- Insert 'vec[i]' among 'vec[i-1], vec[i-2], ...
@@ -106,73 +65,75 @@ insertionV vec = do
           go (n - 1)
 
 -- | Shellsort, Algorithm 2.3
-shell :: (MArray a e (ST s), Ix i, Ord e, Integral i) => a i e -> ST s ()
-shell arr = do
-  (_, n) <- getBounds arr
-  -- 1, 4, 13, 40, 121, 364, 1093, ...
-  let hs = reverse 
-         $ takeWhile (<= n `div` 3 + 1) 
-         $ iterate (\x -> 3 * x + 1) 1
+shellSort :: (Ord a, MVector v a) => v s a -> ST s ()
+shellSort vec = do
+  let n = VM.length vec - 1
+  let hs = reverse . takeWhile (<= n `div` 3 + 1)
+                   $ iterate (\x -> 3 * x + 1) 1
   forM_ hs $ \h' -> forM_ [h'..n] (go h')
     where
       -- Insert 'a[i]' among 'a[i-h], a[i-2*h], ...
-      go h j = 
+      go h j =
         when (j >= h) $ do
-          b <- readArray arr j
-          a <- readArray arr (j - h)
+          b <- read vec j
+          a <- read vec (j - h)
           when (b < a) $ do
-            exch arr j (j - h)
+            swap vec j (j - h)
             go h (j - h)
 
 -- | For merge sort and bottom up merge sort, Algorithms 2.4.
 --   Merge 'arr[lo..mid]' with 'arr[mid+1..hi].
-mergeAux :: (MArray a e (ST s), Ix i, Ord e, Num i, Enum i)
-         => a i e -> i -> i -> i -> ST s ()
-mergeAux arr lo mid hi = do
+merge :: (Ord a, MVector v a) => v s a -> Int -> Int -> Int -> ST s ()
+merge vec lo mid hi = do
     iRef <- newSTRef lo
     jRef <- newSTRef (mid + 1)
     -- Allocate space just once and copy the array.
-    aux  <- mapArray id arr 
+    aux  <- VM.clone vec
     forM_ [lo..hi] $ \k -> do
       i    <- readSTRef iRef
       j    <- readSTRef jRef
-      auxi <- readArray aux (min i hi)
-      auxj <- readArray aux (min j hi)
-      -- Merge back to 'arr[lo..hi]
-      if | i > mid -> do 
-             writeArray arr k =<< readArray aux j
-             writeSTRef jRef (j + 1)
-         | j > hi -> do 
-             writeArray arr k =<< readArray aux i
-             writeSTRef iRef (i + 1)
+      auxi <- read aux (min i hi)
+      auxj <- read aux (min j hi)
+      -- Merge back to 'vec[lo..hi]
+      if | i > mid -> do
+             write vec k =<< read aux j
+             jRef .= j + 1
+         | j > hi -> do
+             write vec k =<< read aux i
+             iRef .= i + 1
          | auxj < auxi -> do
-             writeArray arr k =<< readArray aux j
-             writeSTRef jRef (j + 1)
+             write vec k =<< read aux j
+             jRef .= j + 1
          | otherwise -> do
-             writeArray arr k =<< readArray aux i
-             writeSTRef iRef (i + 1)
-             
+             write vec k =<< read aux i
+             iRef .= i + 1
+  where
+
+
+
 -- | Top-down mergesort, Algorithm 2.4
-merge :: (MArray a e (ST s), Ix i, Ord e, Integral i) => a i e -> ST s () 
-merge arr = do
-  (lo, hi) <- getBounds arr
-  sort lo hi
+mergeSort :: (Ord a, MVector v a) => v s a -> ST s ()
+mergeSort vec = do
+  let hi = VM.length vec - 1
+  sort 0 hi
     where
-      -- Sort arr[lo..hi].
+      -- Sort vec[lo..hi].
       sort l h = when (l < h) $ do
         let m = l + (h - l) `div` 2
         sort l m           -- Sort left half.
         sort (m + 1) h     -- Sort right half.
-        mergeAux arr l m h -- Merge results.
+        merge vec l m h -- Merge results.
 
 -- | Bottom-up mergesort.
-mergeBU :: (MArray a e (ST s), Ix i, Ord e, Num i, Enum i) => a i e -> ST s ()
-mergeBU arr = do
-  (_, hi) <- getBounds arr
+mergeSortBU :: (Ord a, MVector v a) => v s a -> ST s ()
+mergeSortBU vec = do
+  let hi = VM.length vec
   -- Do log hi passes of pairwise merges.
-  forM_ (takeWhile (< hi) [2 ^ i | i <- [(0 :: Int)..]]) $ \sz -> -- sz: subarray size
-    forM_ [0, sz + sz .. hi - sz - 1] $ \i ->            -- i:  subarray index
-      mergeAux arr i (i + sz - 1) (min (i + sz + sz - 1) (hi - 1)) 
+  -- sz: subarray size
+  -- i:  subarray index
+  forM_ (takeWhile (< hi) [2 ^ i | i <- [(0 :: Int)..]]) $ \sz ->
+    forM_ [0, sz + sz .. hi - sz - 1] $ \i ->
+      merge vec i (i + sz - 1) (min (i + sz + sz - 1) (hi - 1))
 
 -- | Partition into 'arr[lo..i-1], a[+1..hi]'. For quicksort, Algorithm 2.5.
 partition :: (MArray a e (ST s), Ix i, Ord e, Num i) => a i e -> i -> i -> ST s i
@@ -204,7 +165,7 @@ partition arr lo hi = do
 
 -- | Quicksort, Algorithm 2.5.
 quick :: (MArray a e (ST s), Ix i, Ord e, Num i) => a i e -> ST s ()
-quick arr = do 
+quick arr = do
   (lo, hi) <- getBounds arr
   sort lo hi
     where
@@ -263,14 +224,10 @@ heap arr = do
         go q1
 
 test :: [Char] -> [Char]
-test xs = V.toList $ runST $ do
-  v <- V.unsafeThaw $ V.fromList xs
-  _ <- selectionV v
+test xs = toList $ runST $ do
+  v <- V.unsafeThaw $ fromList xs
+  _ <- mergeSortBU v
   V.unsafeFreeze v
-      
+
 main :: IO ()
 main = print $ test "MERGESORTEXAMPLE"
---- main = print $ runST $ do
---   xs <- newListArray (0, 15) "MERGESORTEXAMPLE" :: (ST s (STUArray s Int Char))
---   _  <- heap xs
---   getElems xs

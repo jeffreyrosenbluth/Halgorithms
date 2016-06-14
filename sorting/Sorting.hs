@@ -16,9 +16,7 @@ module Sorting where
 
 import           Control.Applicative
 import           Control.Monad
-import           Control.Monad.Primitive
 import           Control.Monad.ST
-import           Data.Array.MArray
 import           Data.STRef
 import           Data.Vector (toList, fromList)
 import qualified Data.Vector.Generic as V
@@ -226,8 +224,9 @@ heap vec = do
         sink vec 0 q1
         go q1
 
-test :: Ord b => (forall v s a. (Ord a, MVector v a)
-              => v s a -> ST s ()) -> [b] -> [b]
+type Sorter v s a = forall v s a. (Ord a, MVector v a) => v s a -> ST s ()
+
+test :: Ord b => Sorter v s a -> [b] -> [b]
 test f xs = toList $ runST $ do
   v <- V.unsafeThaw $ fromList xs
   _ <- f v

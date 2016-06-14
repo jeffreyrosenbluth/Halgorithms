@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiWayIf       #-}
+{-# LANGUAGE RankNTypes       #-}
 {-# LANGUAGE TypeFamilies     #-}
 
 ----------------------------------------------------------
@@ -26,15 +27,16 @@ import qualified Data.Vector.Generic.Mutable as VM
 import           Prelude hiding (read)
 
 (.=) :: STRef s a -> a -> ST s ()
-(.=) v e = writeSTRef v e
+(.=) = writeSTRef
 infix  4 .=
 
-exch :: (MArray a e m, Ix i) => a i e -> i -> i -> m ()
-exch arr i j = do
-  iItem <- readArray arr i
-  jItem <- readArray arr j
-  writeArray arr i jItem
-  writeArray arr j iItem
+(+=) :: Num a => STRef s a -> a -> ST s ()
+(+=) v n = modifySTRef' v (+n)
+infix  4 +=
+
+(-=) :: Num a => STRef s a -> a -> ST s ()
+(-=) v n = modifySTRef' v (\x -> x - n)
+infix  4 -=
 
 -- | Selection sort, Algorithm 2.1
 selectionSort :: (Ord a, MVector v a) => v s a -> ST s ()
@@ -107,9 +109,6 @@ merge vec lo mid hi = do
          | otherwise -> do
              write vec k =<< read aux i
              iRef .= i + 1
-  where
-
-
 
 -- | Top-down mergesort, Algorithm 2.4
 mergeSort :: (Ord a, MVector v a) => v s a -> ST s ()
@@ -135,70 +134,74 @@ mergeSortBU vec = do
     forM_ [0, sz + sz .. hi - sz - 1] $ \i ->
       merge vec i (i + sz - 1) (min (i + sz + sz - 1) (hi - 1))
 
--- | Partition into 'arr[lo..i-1], a[+1..hi]'. For quicksort, Algorithm 2.5.
-partition :: (MArray a e (ST s), Ix i, Ord e, Num i) => a i e -> i -> i -> ST s i
-partition arr lo hi = do
+-- | Partition into 'vec[lo..i-1], a[+1..hi]'. For quicksort, Algorithm 2.5.
+partition :: (Ord a, MVector v a) => v s a -> Int -> Int -> ST s Int
+partition vec lo hi = do
   iRef <- newSTRef lo       -- left scan index
   jRef <- newSTRef (hi + 1) -- right scan index
-  v    <- readArray arr lo  -- partioning item
+  v    <- read vec lo  -- partioning item
+  v    <- read vec lo  -- partioning item
   let setI = do
         modifySTRef' iRef (+1)
         i' <- readSTRef iRef
-        itemI <- readArray arr i'
+        itemI <- read vec i'
+        itemI <- read vec i'
         when (itemI < v && i' < hi) setI
       setJ = do
         modifySTRef' jRef (+(-1))
         j' <- readSTRef jRef
-        itemJ <- readArray arr j'
+        itemJ <- read vec j'
+        itemJ <- read vec j'
         when (v < itemJ && j' > lo) setJ
-      -- Scan rigth, scan left, check for scan complete and exchange.
+      -- Scan rigth, scan left, check for scan complete and swapange.
       go = do
         setI; setJ
         i <- readSTRef iRef
         j <- readSTRef jRef
         if | (i < j) -> do
-               exch arr i j
+               swap vec i j
                go
            | otherwise -> return j
-  exch arr lo =<< go        -- Put 'v = arr[j]' into position
+  swap vec lo =<< go        -- Put 'v = arr[j]' into position
   return =<< readSTRef jRef -- with arr[lo..j-1] <= arr[j+1..hi].
 
 -- | Quicksort, Algorithm 2.5.
-quick :: (MArray a e (ST s), Ix i, Ord e, Num i) => a i e -> ST s ()
-quick arr = do
-  (lo, hi) <- getBounds arr
-  sort lo hi
+quickSort :: (Ord a, MVector v a) => v s a -> ST s ()
+quickSort vec = do
+  let hi = VM.length vec - 1
+  sort 0 hi
     where
       sort l h = when (l < h) $ do
-      j <- partition arr l h
+      j <- partition vec l h
       sort l (j-1)  -- Sort left part 'arr[l..j-1]'.
       sort (j+1) h  -- Sort right part 'arr[j+1..h]'.
 
 -- | Quicksort with 3-way partitioning
-quick3 :: (MArray a e (ST s), Ix i, Ord e, Num i) => a i e -> ST s ()
-quick3 arr = do
-  (lo, hi) <- getBounds arr
-  sort lo hi
+quickSort3 :: (Ord a, MVector v a) => v s a -> ST s ()
+quickSort3 vec = do
+  let hi = VM.length vec - 1
+  sort 0 hi
     where
       sort l h = when (l < h) $ do
       ltRef <- newSTRef l
       iRef  <- newSTRef (l + 1)
       gtRef <- newSTRef h
-      v <- readArray arr l
+      v <- read vec l
+      v <- read vec l
       let go = do
             i     <- readSTRef iRef
             lt    <- readSTRef ltRef
             gt    <- readSTRef gtRef
-            itemI <- readArray arr (min i h)
+            itemI <- read vec (min i h)
             when (i <= gt) $ do
               if | itemI < v -> do
-                     exch arr lt i
-                     modifySTRef' ltRef (+1)
-                     modifySTRef' iRef  (+1)
+                     swap vec lt i
+                     ltRef += 1
+                     iRef += 1
                  | itemI > v -> do
-                     exch arr i gt
-                     modifySTRef' gtRef (+(-1))
-                 | otherwise -> modifySTRef' iRef (+1)
+                     swap vec i gt
+                     gtRef -= 1
+                 | otherwise -> iRef += 1
               go
       go
       lt <- readSTRef ltRef
@@ -207,27 +210,28 @@ quick3 arr = do
       sort l (lt - 1)
       sort (gt + 1) h
 
-sink :: (MArray a e m, Ix i, Ord e, Num i) => a i e -> i -> i -> m ()
+sink :: (Ord a, MVector v a) => v s a -> Int -> Int -> ST s ()
 sink = undefined
 
-heap :: (MArray a e m, Ix i, Ord e, Integral i) => a i e -> m ()
-heap arr = do
-  (_, n) <- getBounds arr
+heap :: (Ord a, MVector v a) => v s a -> ST s ()
+heap vec = do
+  let n = VM.length vec - 1
   let m = (n - 1) `div` 2
-  forM_ [m, m-1..0]  $ \k -> sink arr k n
+  forM_ [m, m-1..0]  $ \k -> sink vec k n
   go n
     where
       go q = when (q > 0) $ do
         let q1 = q - 1
-        exch arr 0 q
-        sink arr 0 q1
+        swap vec 0 q
+        sink vec 0 q1
         go q1
 
-test :: [Char] -> [Char]
-test xs = toList $ runST $ do
+test :: Ord b => (forall v s a. (Ord a, MVector v a)
+              => v s a -> ST s ()) -> [b] -> [b]
+test f xs = toList $ runST $ do
   v <- V.unsafeThaw $ fromList xs
-  _ <- mergeSortBU v
+  _ <- f v
   V.unsafeFreeze v
 
 main :: IO ()
-main = print $ test "MERGESORTEXAMPLE"
+main = print $ test  quickSort "MERGESORTEXAMPLE"

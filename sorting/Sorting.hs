@@ -24,14 +24,18 @@ import           Data.Vector.Generic.Mutable (read, write, swap, MVector)
 import qualified Data.Vector.Generic.Mutable as VM
 import           Prelude hiding (read)
 
+
+-- | Helper function assigning a value to an 'STRef'
 (.=) :: STRef s a -> a -> ST s ()
 (.=) = writeSTRef
 infix  4 .=
 
+-- | Helper function adding a value to an 'STRef'
 (+=) :: Num a => STRef s a -> a -> ST s ()
 (+=) v n = modifySTRef' v (+n)
 infix  4 +=
 
+-- | Helper function subtracting a value to an 'STRef'
 (-=) :: Num a => STRef s a -> a -> ST s ()
 (-=) v n = modifySTRef' v (\x -> x - n)
 infix  4 -=
@@ -42,11 +46,11 @@ selectionSort vec = do
   let n = VM.length vec
   infRef <- newSTRef 0
   forM_ [0..n-1] $ \i -> do
-    writeSTRef infRef i
+    infRef .= i
     forM_ [i+1..n-1] $ \j -> do
       itemJ   <- read vec j
       itemInf <- read vec =<< readSTRef infRef
-      when (itemJ < itemInf) $ writeSTRef infRef j
+      when (itemJ < itemInf) $ infRef .= j
     newInf <- readSTRef infRef
     swap vec i newInf
 

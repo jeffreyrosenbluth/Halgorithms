@@ -18,12 +18,11 @@ import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.ST
 import           Data.STRef
-import           Data.Vector (toList, fromList)
-import qualified Data.Vector.Generic as V
+import qualified Data.Vector.Unboxed         as V
+import           Data.Vector.Generic         (Vector, unsafeThaw, unsafeFreeze, toList, fromList)
 import           Data.Vector.Generic.Mutable (read, write, swap, MVector)
 import qualified Data.Vector.Generic.Mutable as VM
-import           Prelude hiding (read)
-
+import           Prelude                     hiding (read)
 
 -- | Helper function assigning a value to an 'STRef'
 (.=) :: STRef s a -> a -> ST s ()
@@ -41,8 +40,9 @@ infix  4 +=
 infix  4 -=
 
 -- | Selection sort, Algorithm 2.1
-selectionSort :: (Ord a, MVector v a) => v s a -> ST s ()
-selectionSort vec = do
+selectionSort :: (Ord a, Vector v a) => v a -> v a
+selectionSort arr = runST $ do
+  vec <- unsafeThaw arr
   let n = VM.length vec
   infRef <- newSTRef 0
   forM_ [0..n-1] $ \i -> do
@@ -53,37 +53,36 @@ selectionSort vec = do
       when (itemJ < itemInf) $ infRef .= j
     newInf <- readSTRef infRef
     swap vec i newInf
+  unsafeFreeze vec
 
 -- | Insertion sort, Algorithm 2.2
-insertionSort :: (Ord a, MVector v a) => v s a -> ST s ()
-insertionSort vec = do
-  let n = VM.length vec
-  forM_ [1..n-1] go
-    -- Insert 'vec[i]' among 'vec[i-1], vec[i-2], ...
-    where
+insertionSort :: (Ord a, Vector v a) => v a -> v a
+insertionSort arr = runST $ do
+  vec <- unsafeThaw arr
+  let m    = VM.length vec
       go n = when (n > 0) $ do
         b <- read vec n
         a <- read vec (n - 1)
         when (b < a) $ do
           swap vec n (n - 1)
           go (n - 1)
+  forM_ [1..m-1] go
+  unsafeFreeze vec
 
 -- | Shellsort, Algorithm 2.3
-shellSort :: (Ord a, MVector v a) => v s a -> ST s ()
-shellSort vec = do
-  let n = VM.length vec - 1
-  let hs = reverse . takeWhile (<= n `div` 3 + 1)
-                   $ iterate (\x -> 3 * x + 1) 1
+shellSort :: (Ord a, Vector v a) => v a -> v a
+shellSort arr = runST $ do
+  vec <- unsafeThaw arr
+  let n      = VM.length vec - 1
+      hs     = reverse . takeWhile (<= n `div` 3 + 1) $ iterate (\x -> 3 * x + 1) 1
+      go h j = when (j >= h) $ do
+        b <- read vec j
+        a <- read vec (j - h)
+        when (b < a) $ do
+          swap vec j (j - h)
+          go h (j - h)
   forM_ hs $ \h' -> forM_ [h'..n] (go h')
-    where
-      -- Insert 'a[i]' among 'a[i-h], a[i-2*h], ...
-      go h j =
-        when (j >= h) $ do
-          b <- read vec j
-          a <- read vec (j - h)
-          when (b < a) $ do
-            swap vec j (j - h)
-            go h (j - h)
+  unsafeFreeze vec
 
 -- | For merge sort and bottom up merge sort, Algorithms 2.4.
 --   Merge 'arr[lo..mid]' with 'arr[mid+1..hi].
@@ -113,21 +112,22 @@ merge vec lo mid hi = do
              iRef .= i + 1
 
 -- | Top-down mergesort, Algorithm 2.4
-mergeSort :: (Ord a, MVector v a) => v s a -> ST s ()
-mergeSort vec = do
+mergeSort :: (Ord a, Vector v a) => v a -> v a
+mergeSort arr = runST $ do
+  vec <- unsafeThaw arr
   let hi = VM.length vec - 1
-  sort 0 hi
-    where
-      -- Sort vec[lo..hi].
       sort l h = when (l < h) $ do
         let m = l + (h - l) `div` 2
         sort l m           -- Sort left half.
         sort (m + 1) h     -- Sort right half.
         merge vec l m h -- Merge results.
+  sort 0 hi
+  unsafeFreeze vec
 
 -- | Bottom-up mergesort.
-mergeSortBU :: (Ord a, MVector v a) => v s a -> ST s ()
-mergeSortBU vec = do
+mergeSortBU :: (Ord a, Vector v a) => v a -> v a
+mergeSortBU arr = runST $ do
+  vec <- unsafeThaw arr
   let hi = VM.length vec
   -- Do log hi passes of pairwise merges.
   -- sz: subarray size
@@ -135,6 +135,7 @@ mergeSortBU vec = do
   forM_ (takeWhile (< hi) [2 ^ i | i <- [(0 :: Int)..]]) $ \sz ->
     forM_ [0, sz + sz .. hi - sz - 1] $ \i ->
       merge vec i (i + sz - 1) (min (i + sz + sz - 1) (hi - 1))
+  unsafeFreeze vec
 
 -- | Partition into 'vec[lo..i-1], a[+1..hi]'. For quicksort, Algorithm 2.5.
 partition :: (Ord a, MVector v a) => v s a -> Int -> Int -> ST s Int
@@ -165,25 +166,25 @@ partition vec lo hi = do
                go
            | otherwise -> return j
   swap vec lo =<< go        -- Put 'v = arr[j]' into position
-  return =<< readSTRef jRef -- with arr[lo..j-1] <= arr[j+1..hi].
+  readSTRef jRef -- with arr[lo..j-1] <= arr[j+1..hi].
 
 -- | Quicksort, Algorithm 2.5.
-quickSort :: (Ord a, MVector v a) => v s a -> ST s ()
-quickSort vec = do
+quickSort :: (Ord a, Vector v a) => v a -> v a
+quickSort arr = runST $ do
+  vec <- unsafeThaw arr
   let hi = VM.length vec - 1
-  sort 0 hi
-    where
       sort l h = when (l < h) $ do
       j <- partition vec l h
       sort l (j-1)  -- Sort left part 'arr[l..j-1]'.
       sort (j+1) h  -- Sort right part 'arr[j+1..h]'.
+  sort 0 hi
+  unsafeFreeze vec
 
 -- | Quicksort with 3-way partitioning
-quickSort3 :: (Ord a, MVector v a) => v s a -> ST s ()
-quickSort3 vec = do
+quickSort3 :: (Ord a, Vector v a) => v a -> v a
+quickSort3 arr = runST $ do
+  vec <- unsafeThaw arr
   let hi = VM.length vec - 1
-  sort 0 hi
-    where
       sort l h = when (l < h) $ do
       ltRef <- newSTRef l
       iRef  <- newSTRef (l + 1)
@@ -211,6 +212,8 @@ quickSort3 vec = do
       -- Now 'arr[l..lt-1] < v = arr[lt..gt] < arr[gt+1..h]'.
       sort l (lt - 1)
       sort (gt + 1) h
+  sort 0 hi
+  unsafeFreeze vec
 
 sink :: (Ord a, MVector v a) => v s a -> Int -> Int -> ST s ()
 sink = undefined
@@ -228,13 +231,8 @@ heap vec = do
         sink vec 0 q1
         go q1
 
-type Sorter v s a = forall v s a. (Ord a, MVector v a) => v s a -> ST s ()
-
-test :: Ord b => Sorter v s a -> [b] -> [b]
-test f xs = toList $ runST $ do
-  v <- V.unsafeThaw $ fromList xs
-  _ <- f v
-  V.unsafeFreeze v
+test :: Vector v a => (v a -> v a) -> [a] -> v a
+test f xs = f (fromList xs)
 
 main :: IO ()
-main = print $ test  quickSort "MERGESORTEXAMPLE"
+main = print $ (test  quickSort3 "MERGESORTEXAMPLE" :: V.Vector Char)

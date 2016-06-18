@@ -3,35 +3,38 @@
 ----------------------------------------------------------
 -- |
 -- 2 Sorting
--- Selection sort, Inserting sort, Shellsort, Megesort,
--- Bottum up mergesort and QuickSort.
+-- Shellsort.
 -- Transcription of "http://algs4.cs.princeton.edu".
--- (c) 2014 Jeffrey Rosenbluth
+-- (c) 2014-16 Jeffrey Rosenbluth
 ----------------------------------------------------------
 
 module Sorting.Shell where
 
 import           Common.References
+import           Sorting.Sorting
 
 import           Control.Monad
 import           Control.Monad.ST
 import           Data.STRef
-import           Data.Vector.Generic         (Vector, unsafeThaw, unsafeFreeze)
-import           Data.Vector.Generic.Mutable (read, write, swap, MVector)
-import qualified Data.Vector.Generic.Mutable as VM
-import           Prelude                     hiding (read)
+import           Data.Vector.Generic         (Vector)
+import           Data.Vector.Generic.Mutable (MVector, unsafeRead, unsafeSwap, length)
+import           Prelude                     hiding (length)
 
--- | Shellsort, Algorithm 2.3
-sort :: (Ord a, Vector v a) => v a -> v a
-sort arr = runST $ do
-  vec <- unsafeThaw arr
-  let n      = VM.length vec - 1
-      hs     = reverse . takeWhile (<= n `div` 3 + 1) $ iterate (\x -> 3 * x + 1) 1
+
+-- | Shellsort, Algorithm 2.3. For mutable vectors.
+sort' :: (Ord a, MVector v a) => v s a -> ST s ()
+sort' vec = do
+  let n      = length vec - 1
+      hs     = reverse . takeWhile (<= n `div` 3 + 1)
+                       $ iterate (\x -> 3 * x + 1) 1
       go h j = when (j >= h) $ do
-        b <- read vec j
-        a <- read vec (j - h)
+        b <- unsafeRead vec j
+        a <- unsafeRead vec (j - h)
         when (b < a) $ do
-          swap vec j (j - h)
+          unsafeSwap vec j (j - h)
           go h (j - h)
-  forM_ hs $ \h' -> forM_ [h'..n] (go h')
-  unsafeFreeze vec
+  forM_ hs $ \h' -> forM_ [h' .. n] (go h')
+
+-- | Shellsort, Algorithm 2.3. For immutable vectors.
+sort :: (Ord a, Vector v a) => v a -> v a
+sort = immutableSort sort'

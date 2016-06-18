@@ -1,5 +1,3 @@
-{-# LANGUAGE MultiWayIf       #-}
-
 ----------------------------------------------------------
 -- |
 -- 2 Sorting
@@ -10,15 +8,16 @@
 
 module Sorting.Insertion where
 
+import           Sorting.Sorting
+
 import           Control.Monad
-import           Control.Monad.Primitive     (PrimMonad, PrimState)
 import           Control.Monad.ST
-import           Data.Vector.Generic         (Vector, unsafeThaw, unsafeFreeze)
+import           Data.Vector.Generic         (Vector)
 import           Data.Vector.Generic.Mutable (MVector, unsafeRead, unsafeSwap, length)
 import           Prelude                     hiding (length)
 
 -- | Insertion sort, Algorithm 2.2. For mutable vectors.
-sort' :: (Ord a, PrimMonad m, MVector v a) => v (PrimState m) a -> m ()
+sort' :: (Ord a, MVector v a) => v s a -> ST s ()
 sort' vec =
   forM_ [0 .. length vec - 1]
     (\i -> forM_ [i, i - 1 .. 1]
@@ -29,7 +28,4 @@ sort' vec =
 
 -- | Insertion sort, Algorithm 2.2. For immutable vectors.
 sort :: (Ord a, Vector v a) => v a -> v a
-sort arr = runST $ do
-  vec <- unsafeThaw arr
-  sort' vec
-  unsafeFreeze vec
+sort = immutableSort sort'

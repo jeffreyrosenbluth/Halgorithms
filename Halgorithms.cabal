@@ -16,7 +16,8 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Sorting.Selection
-                     , Sorting.Merge
+                     , Sorting.MergeTD
+                     , Sorting.MergeBU
                      , Sorting.Quick
                      , Sorting.Quick3
                      , Sorting.Insertion

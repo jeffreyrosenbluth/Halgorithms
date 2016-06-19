@@ -1,4 +1,4 @@
-name:                Halgorithms
+name:                halgorithms
 version:             0.1.0.0
 synopsis:            Initial project template from stack
 description:         Please see README.md
@@ -23,6 +23,7 @@ library
                      , Sorting.Insertion
                      , Sorting.Heap
                      , Sorting.Shell
+                     , Sorting.Sorting
   build-depends:       base >= 4.7 && < 5
                      , vector >= 0.11 && < 0.12
                      , primitive >= 0.6 && < 0.7
@@ -33,7 +34,7 @@ executable Halgorithms-exe
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
-                     , Halgorithms
+                     , halgorithms
   default-language:    Haskell2010
 
 test-suite Halgorithms-test
@@ -41,7 +42,9 @@ test-suite Halgorithms-test
   hs-source-dirs:      test
   main-is:             Spec.hs
   build-depends:       base
-                     , Halgorithms
+                     , hspec >= 2.2 && < 2.3
+                     , vector >= 0.11 && < 0.12
+                     , halgorithms
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 

@@ -1,7 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE MultiWayIf #-}
 
-
 module Sorting.Sorting where
 
 import           Common.References
@@ -24,25 +23,16 @@ immutableSort sort arr = runST $ do
 --   Merge 'arr[lo..mid]' with 'arr[mid+1..hi].
 merge :: (Ord a, MVector v a) => v s a -> Int -> Int -> Int -> ST s ()
 merge vec lo mid hi = do
-    iRef <- newSTRef lo
-    jRef <- newSTRef (mid + 1)
-    -- Allocate space just once and copy the array.
-    aux  <- clone vec
+    r1  <- newSTRef lo
+    r2  <- newSTRef (mid + 1)
+    aux <- clone vec
+    let put i j = unsafeRead aux j >>= unsafeWrite vec i
     forM_ [lo..hi] $ \k -> do
-      i    <- readSTRef iRef
-      j    <- readSTRef jRef
-      auxi <- unsafeRead aux (min i hi)
-      auxj <- unsafeRead aux (min j hi)
-      -- Merge back to 'vec[lo..hi]
-      if | i > mid -> do
-             unsafeWrite vec k =<< unsafeRead aux j
-             jRef .= j + 1
-         | j > hi -> do
-             unsafeWrite vec k =<< unsafeRead aux i
-             iRef .= i + 1
-         | auxj < auxi -> do
-             unsafeWrite vec k =<< unsafeRead aux j
-             jRef .= j + 1
-         | otherwise -> do
-             unsafeWrite vec k =<< unsafeRead aux i
-             iRef .= i + 1
+      n1   <- readSTRef r1
+      n2   <- readSTRef r2
+      aux1 <- unsafeRead aux (min n1 hi)
+      aux2 <- unsafeRead aux (min n2 hi)
+      if | n1 > mid    -> put k n2 >> r2 += 1
+         | n2 > hi     -> put k n1 >> r1 += 1
+         | aux2 < aux1 -> put k n2 >> r2 += 1
+         | otherwise   -> put k n1 >> r1 += 1

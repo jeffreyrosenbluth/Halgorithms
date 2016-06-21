@@ -33,6 +33,7 @@ sort' vec = do
         gtRef <- newSTRef h
         v <- unsafeRead vec l
         v <- unsafeRead vec l
+
         let go = do
               i     <- readSTRef iRef
               lt    <- readSTRef ltRef
@@ -48,6 +49,7 @@ sort' vec = do
                        gtRef -= 1
                    | otherwise -> iRef += 1
                 go
+                
         go
         lt <- readSTRef ltRef
         gt <- readSTRef gtRef

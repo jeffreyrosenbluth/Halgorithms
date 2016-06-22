@@ -2,6 +2,7 @@ module Sorting.InsertionSpec (spec) where
 
 import           Test.Hspec
 import           Test.QuickCheck
+import           Sorting.Sorting
 import           Sorting.Insertion
 import qualified Data.Vector as V
 import qualified Data.List as L
@@ -13,3 +14,5 @@ spec =
       sort (V.fromList "sortexample") `shouldBe` V.fromList "aeelmoprstx"
     it "Sorts a list of Ints." $ property $
       \x -> (sort . V.fromList) x == V.fromList (L.sort (x :: [Int]))
+    it "Sorts a list of Ints mod 3." $ property $
+      \x -> (sortOn (`mod` 3) . V.fromList) x == V.fromList (L.sortOn (`mod` 3) (x :: [Int]))

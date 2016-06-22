@@ -1,10 +1,11 @@
 module Sorting.SelectionSpec (spec) where
 
+import qualified Data.List         as L
+import qualified Data.Vector       as V
+import           Sorting.Selection
+import           Sorting.Sorting
 import           Test.Hspec
 import           Test.QuickCheck
-import           Sorting.Selection
-import qualified Data.Vector as V
-import qualified Data.List as L
 
 
 spec :: Spec

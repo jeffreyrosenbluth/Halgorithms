@@ -1,10 +1,11 @@
 module Sorting.Quick3Spec (spec) where
 
+import qualified Data.List       as L
+import qualified Data.Vector     as V
+import           Sorting.Quick3
+import           Sorting.Sorting
 import           Test.Hspec
 import           Test.QuickCheck
-import           Sorting.Quick3
-import qualified Data.Vector as V
-import qualified Data.List as L
 
 spec :: Spec
 spec =

@@ -1,10 +1,11 @@
 module Sorting.ShellSpec (spec) where
 
+import qualified Data.List       as L
+import qualified Data.Vector     as V
+import           Sorting.Shell
+import           Sorting.Sorting
 import           Test.Hspec
 import           Test.QuickCheck
-import           Sorting.Shell
-import qualified Data.Vector as V
-import qualified Data.List as L
 
 spec :: Spec
 spec =

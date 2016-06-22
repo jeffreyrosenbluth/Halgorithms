@@ -1,10 +1,11 @@
 module Sorting.QuickSpec (spec) where
 
-import Test.Hspec
-import Test.QuickCheck
-import Sorting.Quick
-import qualified Data.Vector as V
-import qualified Data.List as L
+import qualified Data.List       as L
+import qualified Data.Vector     as V
+import           Sorting.Quick
+import           Sorting.Sorting
+import           Test.Hspec
+import           Test.QuickCheck
 
 
 spec :: Spec

@@ -1,10 +1,11 @@
 module Sorting.MergeTDSpec (spec) where
 
-import Test.Hspec
-import Test.QuickCheck
-import Sorting.MergeTD
-import qualified Data.Vector as V
-import qualified Data.List as L
+import qualified Data.List       as L
+import qualified Data.Vector     as V
+import           Sorting.MergeTD
+import           Sorting.Sorting
+import           Test.Hspec
+import           Test.QuickCheck
 
 spec :: Spec
 spec =

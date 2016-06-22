@@ -14,3 +14,5 @@ spec =
       sort (V.fromList "sortexample") `shouldBe` V.fromList "aeelmoprstx"
     it "Sorts a list of Ints." $ property $
       \x -> (sort . V.fromList) x == V.fromList (L.sort (x :: [Int]))
+    it "Merge sort is stable." $ property $
+      \x -> (sortOn (`mod` 3) . V.fromList) x == V.fromList (L.sortOn (`mod` 3) (x :: [Int]))

@@ -7,7 +7,6 @@ import           Sorting.Sorting
 import           Test.Hspec
 import           Test.QuickCheck
 
-
 spec :: Spec
 spec =
   describe "Seclection Sort" $ do

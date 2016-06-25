@@ -1,5 +1,5 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE FlexibleInstances #-}
-
 ----------------------------------------------------------
 -- |
 -- 2 Sorting
@@ -46,10 +46,22 @@ partition cmp vec lo hi = do
   readSTRef jRef
 
 -- | Quicksort, Algorithm 2.5. For mutable vectors.
-instance Sortable a where
-  sortBy' cmp vec =   qSort 0 $ length vec - 1
-    where
-      qSort l h = when (l < h) $ do
-        j <- partition cmp vec l h
-        qSort l (j - 1)
-        qSort (j + 1) h
+sortBy' :: MVector v a => (a -> a -> Ordering) -> v s a -> ST s ()
+sortBy' cmp vec =   qSort 0 $ length vec - 1
+  where
+    qSort l h = when (l < h) $ do
+      j <- partition cmp vec l h
+      qSort l (j - 1)
+      qSort (j + 1) h
+
+sort' :: (Ord a, MVector v a) => v s a -> ST s ()
+sort' = sortBy' compare
+
+sortBy :: (Vector v a) => (a -> a -> Ordering) -> v a -> v a
+sortBy = toImmutable sortBy'
+
+sort :: (Ord a, Vector v a) => v a -> v a
+sort = sortBy compare
+
+sortOn :: (Ord b, Vector v a, Vector v (b, a), Functor v) => (a -> b) -> v a -> v a
+sortOn = mkSortOn sortBy'

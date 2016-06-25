@@ -12,41 +12,19 @@ import           Data.STRef
 import           Data.Vector.Generic         (Vector, unsafeThaw, unsafeFreeze)
 import           Data.Vector.Generic.Mutable (MVector, unsafeRead, unsafeWrite, clone)
 
-type Sorter = forall v s a. (Ord a, MVector v a) => v s a -> ST s ()
-type Sorter' = forall v s a. MVector v a => (a -> a -> Ordering) -> v s a -> ST s ()
+type Sorter = forall v s a. MVector v a => (a -> a -> Ordering) -> v s a -> ST s ()
 
-class Sortable a where
-  sortBy' :: MVector v a => (a -> a -> Ordering) -> v s a -> ST s ()
-
-  sort' :: (Ord a, MVector v a) => v s a -> ST s ()
-  sort' = sortBy' compare
-
-sortBy :: (Vector v a, Sortable a) => (a -> a -> Ordering) -> v a -> v a
-sortBy cmp arr = runST $ do
+toImmutable :: (Vector v a) => Sorter -> (a -> a -> Ordering) -> v a -> v a
+toImmutable sorter cmp arr = runST $ do
   vec <- unsafeThaw arr
-  sortBy' cmp vec
+  sorter cmp vec
   unsafeFreeze vec
 
-sort :: (Ord a, Vector v a, Sortable a) => v a -> v a
-sort = sortBy compare
-
-sortOn :: (Ord b, Vector v a, Vector v (b, a), Functor v, Sortable (b, a))
-     => (a -> b) -> v a -> v a
-sortOn f = fmap snd
-       . sortBy (comparing fst)
+mkSortOn :: (Ord b, Vector v a, Vector v (b, a), Functor v)
+     => Sorter -> (a -> b) -> v a -> v a
+mkSortOn sorter f = fmap snd
+       . toImmutable sorter (comparing fst)
        . fmap (\x -> let y = f x in y `seq` (y, x))
-
-immutableSort :: (Ord a, Vector v a) => Sorter -> v a -> v a
-immutableSort sort arr = runST $ do
-  vec <- unsafeThaw arr
-  sort vec
-  unsafeFreeze vec
-
-immutableSortBy :: Vector v a => (a -> a -> Ordering) -> Sorter' -> v a -> v a
-immutableSortBy cmp sortBy arr = runST $ do
-  vec <- unsafeThaw arr
-  sortBy cmp vec
-  unsafeFreeze vec
 
 -- | For merge sort and bottom up merge sort, Algorithms 2.4.
 --   Merge 'arr[lo..mid]' with 'arr[mid+1..hi].
@@ -61,7 +39,7 @@ merge cmp vec lo mid hi = do
       n2   <- readSTRef r2
       aux1 <- unsafeRead aux (min n1 hi)
       aux2 <- unsafeRead aux (min n2 hi)
-      if | n1 > mid    -> put k n2 >> r2 += 1
-         | n2 > hi     -> put k n1 >> r1 += 1
+      if | n1 > mid -> put k n2 >> r2 += 1
+         | n2 > hi  -> put k n1 >> r1 += 1
          | aux2 `cmp` aux1 == LT -> put k n2 >> r2 += 1
-         | otherwise   -> put k n1 >> r1 += 1
+         | otherwise -> put k n1 >> r1 += 1

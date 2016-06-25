@@ -1,6 +1,6 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiWayIf        #-}
-
 ----------------------------------------------------------
 -- |
 -- 2 Sorting
@@ -23,15 +23,27 @@ import           Sorting.Sorting
 
 
 -- | Shellsort, Algorithm 2.3. For mutable vectors.
-instance Sortable a where
-  sortBy' cmp vec = do
-    let n      = length vec - 1
-        hs     = reverse . takeWhile (<= n `div` 3 + 1)
-                         $ iterate (\x -> 3 * x + 1) 1
-        go h j = when (j >= h) $ do
-          b <- unsafeRead vec j
-          a <- unsafeRead vec (j - h)
-          when (b `cmp` a == LT) $ do
-            unsafeSwap vec j (j - h)
-            go h (j - h)
-    forM_ hs $ \h' -> forM_ [h' .. n] (go h')
+sortBy' :: MVector v a => (a -> a -> Ordering) -> v s a -> ST s ()
+sortBy' cmp vec = do
+  let n      = length vec - 1
+      hs     = reverse . takeWhile (<= n `div` 3 + 1)
+                       $ iterate (\x -> 3 * x + 1) 1
+      go h j = when (j >= h) $ do
+        b <- unsafeRead vec j
+        a <- unsafeRead vec (j - h)
+        when (b `cmp` a == LT) $ do
+          unsafeSwap vec j (j - h)
+          go h (j - h)
+  forM_ hs $ \h' -> forM_ [h' .. n] (go h')
+
+sort' :: (Ord a, MVector v a) => v s a -> ST s ()
+sort' = sortBy' compare
+
+sortBy :: (Vector v a) => (a -> a -> Ordering) -> v a -> v a
+sortBy = toImmutable sortBy'
+
+sort :: (Ord a, Vector v a) => v a -> v a
+sort = sortBy compare
+
+sortOn :: (Ord b, Vector v a, Vector v (b, a), Functor v) => (a -> b) -> v a -> v a
+sortOn = mkSortOn sortBy'

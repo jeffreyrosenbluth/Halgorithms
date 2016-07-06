@@ -26,20 +26,20 @@ partition cmp vec lo hi = do
   iRef <- newSTRef lo
   jRef <- newSTRef (hi + 1)
   v    <- unsafeRead vec lo
-  let setI = do
+  let left = do
         iRef += 1
-        i'    <- readSTRef iRef
-        itemI <- unsafeRead vec i'
-        when (itemI `cmp` v == LT && i' < hi) setI
-      setJ = do
+        i     <- readSTRef iRef
+        itemI <- unsafeRead vec i
+        when (itemI `cmp` v == LT && i < hi) left
+      right = do
         jRef -= 1
-        j'    <- readSTRef jRef
-        itemJ <- unsafeRead vec j'
-        when (v `cmp` itemJ == LT && j' > lo) setJ
+        j     <- readSTRef jRef
+        itemJ <- unsafeRead vec j
+        when (itemJ `cmp` v == GT && j > lo) right
       go = do
-        setI
+        left
         i <- readSTRef iRef
-        setJ
+        right
         j <- readSTRef jRef
         if i < j then unsafeSwap vec i j >> go else return j
   go >>= unsafeSwap vec lo

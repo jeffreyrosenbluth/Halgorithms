@@ -14,7 +14,8 @@ import           Data.STRef
 import           Data.Vector.Generic         (Vector, unsafeThaw, unsafeFreeze)
 import           Data.Vector.Generic.Mutable (MVector, unsafeRead, unsafeWrite, clone)
 
-type Sorter = forall v s a. MVector v a => (a -> a -> Ordering) -> v s a -> ST s ()
+type Sorter = forall v s a. MVector v a
+           => (a -> a -> Ordering) -> v s a -> ST s ()
 
 toImmutable :: (Vector v a) => Sorter -> (a -> a -> Ordering) -> v a -> v a
 toImmutable sorter cmp arr = runST $ do

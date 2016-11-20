@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiWayIf       #-}
 
 ----------------------------------------------------------
@@ -17,8 +17,8 @@ import           Common.References
 import           Control.Monad
 import           Control.Monad.Primitive
 import           Data.Primitive.MutVar
-import           Data.Vector.Generic         (Vector, unsafeThaw, unsafeFreeze)
-import           Data.Vector.Generic.Mutable (unsafeRead, write, swap, MVector, length)
+import           Data.Vector.Generic         (Vector)
+import           Data.Vector.Generic.Mutable (MVector, unsafeRead, swap, length)
 import           Prelude                     hiding (read, length)
 import           Sorting.Sorting
 
@@ -62,5 +62,6 @@ sortBy = toImmutable sortBy'
 sort :: (Ord a, Vector v a) => v a -> v a
 sort = sortBy compare
 
-sortOn :: (Ord b, Vector v a, Vector v (b, a), Functor v) => (a -> b) -> v a -> v a
+sortOn :: (Ord b, Vector v a, Vector v (b, a), Functor v)
+       => (a -> b) -> v a -> v a
 sortOn = mkSortOn sortBy'

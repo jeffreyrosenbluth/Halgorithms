@@ -13,8 +13,7 @@ module Sorting.Shell where
 
 import           Common.References
 import           Control.Monad
-import           Control.Monad.ST
-import           Data.STRef
+import           Control.Monad.Primitive
 import           Data.Vector.Generic         (Vector)
 import           Data.Vector.Generic.Mutable (MVector, length, unsafeRead,
                                               unsafeSwap)
@@ -23,7 +22,8 @@ import           Sorting.Sorting
 
 
 -- | Shellsort, Algorithm 2.3. For mutable vectors.
-sortBy' :: MVector v a => (a -> a -> Ordering) -> v s a -> ST s ()
+sortBy' :: (PrimMonad m, MVector v a)
+        => (a -> a -> Ordering) -> v (PrimState m) a -> m ()
 sortBy' cmp vec = do
   let n      = length vec - 1
       hs     = reverse . takeWhile (<= n `div` 3 + 1)
@@ -36,7 +36,7 @@ sortBy' cmp vec = do
           go h (j - h)
   forM_ hs $ \h' -> forM_ [h' .. n] (go h')
 
-sort' :: (Ord a, MVector v a) => v s a -> ST s ()
+sort' :: (PrimMonad m, Ord a, MVector v a) => v (PrimState m) a -> m ()
 sort' = sortBy' compare
 
 sortBy :: (Vector v a) => (a -> a -> Ordering) -> v a -> v a

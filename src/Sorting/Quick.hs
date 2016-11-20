@@ -14,39 +14,41 @@ module Sorting.Quick where
 import           Common.References
 import           Sorting.Sorting
 import           Control.Monad               (when)
-import           Control.Monad.ST            (ST, runST)
-import           Data.STRef
+import           Control.Monad.Primitive
+import           Data.Primitive.MutVar
 import           Data.Vector.Generic         (Vector)
 import           Data.Vector.Generic.Mutable (MVector, unsafeRead, unsafeSwap, length)
 import           Prelude                     hiding (length)
 
 -- | Partition into 'vec[lo..i-1], a[+1..hi]'. For quicksort, Algorithm 2.5.
-partition :: MVector v a => (a -> a -> Ordering) -> v s a -> Int -> Int -> ST s Int
+partition :: (PrimMonad m, MVector v a )
+          => (a -> a -> Ordering) -> v (PrimState m) a -> Int -> Int -> m Int
 partition cmp vec lo hi = do
-  iRef <- newSTRef lo
-  jRef <- newSTRef (hi + 1)
+  iRef <- newMutVar lo
+  jRef <- newMutVar (hi + 1)
   v    <- unsafeRead vec lo
   let left = do
         iRef += 1
-        i     <- readSTRef iRef
+        i     <- readMutVar iRef
         itemI <- unsafeRead vec i
         when (itemI `cmp` v == LT && i < hi) left
       right = do
         jRef -= 1
-        j     <- readSTRef jRef
+        j     <- readMutVar jRef
         itemJ <- unsafeRead vec j
         when (itemJ `cmp` v == GT && j > lo) right
       go = do
         left
-        i <- readSTRef iRef
+        i <- readMutVar iRef
         right
-        j <- readSTRef jRef
+        j <- readMutVar jRef
         if i < j then unsafeSwap vec i j >> go else return j
   go >>= unsafeSwap vec lo
-  readSTRef jRef
+  readMutVar jRef
 
 -- | Quicksort, Algorithm 2.5. For mutable vectors.
-sortBy' :: MVector v a => (a -> a -> Ordering) -> v s a -> ST s ()
+sortBy' :: (PrimMonad m, MVector v a)
+        => (a -> a -> Ordering) -> v (PrimState m) a -> m ()
 sortBy' cmp vec =   qSort 0 $ length vec - 1
   where
     qSort l h = when (l < h) $ do
@@ -54,7 +56,7 @@ sortBy' cmp vec =   qSort 0 $ length vec - 1
       qSort l (j - 1)
       qSort (j + 1) h
 
-sort' :: (Ord a, MVector v a) => v s a -> ST s ()
+sort' :: (PrimMonad m, Ord a, MVector v a) => v (PrimState m) a -> m ()
 sort' = sortBy' compare
 
 sortBy :: (Vector v a) => (a -> a -> Ordering) -> v a -> v a

@@ -1,19 +1,19 @@
 module Common.References where
 
-import           Control.Monad.ST
-import           Data.STRef
+import           Control.Monad.Primitive
+import           Data.Primitive.MutVar
 
--- | Helper function assigning a value to an 'STRef'
-(.=) :: STRef s a -> a -> ST s ()
-(.=) = writeSTRef
+-- | Helper function assigning a value to an 'MutVar'
+(.=) :: (PrimMonad m) => MutVar (PrimState m) a -> a -> m ()
+(.=) = writeMutVar
 infix  4 .=
 
--- | Helper function adding a value to an 'STRef'
-(+=) :: Num a => STRef s a -> a -> ST s ()
-(+=) v n = modifySTRef' v (+n)
+-- | Helper function adding a value to an 'MutVar'
+(+=) :: (PrimMonad m, Num a) => MutVar (PrimState m) a -> a -> m ()
+(+=) v n = modifyMutVar' v (+n)
 infix  4 +=
 
--- | Helper function subtracting a value to an 'STRef'
-(-=) :: Num a => STRef s a -> a -> ST s ()
-(-=) v n = modifySTRef' v (\x -> x - n)
+-- | Helper function subtracting a value to an 'MutVar'
+(-=) :: (PrimMonad m, Num a) => MutVar (PrimState m) a -> a -> m ()
+(-=) v n = modifyMutVar' v (\x -> x - n)
 infix  4 -=

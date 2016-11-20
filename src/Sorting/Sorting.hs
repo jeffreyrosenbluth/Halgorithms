@@ -7,7 +7,9 @@ module Sorting.Sorting where
 import           Common.References
 import           Control.Monad               (forM_)
 import           Control.Monad.ST            (ST, runST)
+import           Control.Monad.Primitive
 import           Data.Ord                    (comparing)
+import           Data.Primitive.MutVar
 import           Data.STRef
 import           Data.Vector.Generic         (Vector, unsafeThaw, unsafeFreeze)
 import           Data.Vector.Generic.Mutable (MVector, unsafeRead, unsafeWrite, clone)
@@ -28,15 +30,16 @@ mkSortOn sorter f = fmap snd
 
 -- | For merge sort and bottom up merge sort, Algorithms 2.4.
 --   Merge 'arr[lo..mid]' with 'arr[mid+1..hi].
-merge :: MVector v a => (a -> a -> Ordering) -> v s a -> Int -> Int -> Int -> ST s ()
+merge :: (PrimMonad m, MVector v a)
+      => (a -> a -> Ordering) -> v (PrimState m) a -> Int -> Int -> Int -> m ()
 merge cmp vec lo mid hi = do
-    r1  <- newSTRef lo
-    r2  <- newSTRef (mid + 1)
+    r1  <- newMutVar lo
+    r2  <- newMutVar (mid + 1)
     aux <- clone vec
     let put i j = unsafeRead aux j >>= unsafeWrite vec i
     forM_ [lo..hi] $ \k -> do
-      n1   <- readSTRef r1
-      n2   <- readSTRef r2
+      n1   <- readMutVar r1
+      n2   <- readMutVar r2
       aux1 <- unsafeRead aux (min n1 hi)
       aux2 <- unsafeRead aux (min n2 hi)
       if | n1 > mid -> put k n2 >> r2 += 1

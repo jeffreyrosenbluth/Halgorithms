@@ -13,7 +13,7 @@ module Sorting.MergeTD where
 
 import           Common.References
 import           Control.Monad               (when)
-import           Control.Monad.ST            (ST)
+import           Control.Monad.Primitive
 import           Data.Vector.Generic         (Vector)
 import           Data.Vector.Generic.Mutable (MVector, clone, length,
                                               unsafeRead, unsafeWrite)
@@ -21,7 +21,8 @@ import           Prelude                     hiding (length)
 import           Sorting.Sorting
 
 
-sortBy' :: MVector v a => (a -> a -> Ordering) -> v s a -> ST s ()
+sortBy' :: (PrimMonad m, MVector v a)
+        => (a -> a -> Ordering) -> v (PrimState m) a -> m ()
 sortBy' cmp vec = do
   let mSort l h = when (l < h) $ do
         let m = l + (h - l) `div` 2
@@ -30,7 +31,7 @@ sortBy' cmp vec = do
         merge cmp vec l m h    -- Merge results.
   mSort 0 $ length vec - 1
 
-sort' :: (Ord a, MVector v a) => v s a -> ST s ()
+sort' :: (PrimMonad m, Ord a, MVector v a) => v (PrimState m) a -> m ()
 sort' = sortBy' compare
 
 sortBy :: (Vector v a) => (a -> a -> Ordering) -> v a -> v a

@@ -12,8 +12,8 @@ module Sorting.Selection where
 
 import           Common.References
 import           Control.Monad
-import           Control.Monad.ST
-import           Data.STRef
+import           Control.Monad.Primitive
+import           Data.Primitive.MutVar
 import           Data.Vector.Generic         (Vector)
 import           Data.Vector.Generic.Mutable (MVector, length, unsafeRead,
                                               unsafeSwap)
@@ -21,20 +21,21 @@ import           Prelude                     hiding (length)
 import           Sorting.Sorting
 
 -- | Selection sort, Algorithm 2.1. For mutable vectors.
-sortBy' :: MVector v a => (a -> a -> Ordering) -> v s a -> ST s ()
+sortBy' :: (PrimMonad m, MVector v a)
+        => (a -> a -> Ordering) -> v (PrimState m) a -> m ()
 sortBy' cmp vec = do
   let n = length vec
-  infRef <- newSTRef 0
+  infRef <- newMutVar 0
   forM_ [0 .. n - 1] $ \i -> do
     infRef .= i
     forM_ [i + 1 .. n - 1] $ \j -> do
       itemJ   <- unsafeRead vec j
-      itemInf <- unsafeRead vec =<< readSTRef infRef
+      itemInf <- unsafeRead vec =<< readMutVar infRef
       when (itemJ `cmp` itemInf == LT) $ infRef .= j
-    newInf <- readSTRef infRef
+    newInf <- readMutVar infRef
     unsafeSwap vec i newInf
 
-sort' :: (Ord a, MVector v a) => v s a -> ST s ()
+sort' :: (PrimMonad m, Ord a, MVector v a) => v (PrimState m) a -> m ()
 sort' = sortBy' compare
 
 sortBy :: (Vector v a) => (a -> a -> Ordering) -> v a -> v a

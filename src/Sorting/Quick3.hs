@@ -14,8 +14,8 @@ module Sorting.Quick3 where
 
 import           Common.References
 import           Control.Monad               (when)
-import           Control.Monad.ST
-import           Data.STRef
+import           Control.Monad.Primitive
+import           Data.Primitive.MutVar
 import           Data.Vector.Generic         (Vector)
 import           Data.Vector.Generic.Mutable (MVector, length, unsafeRead,
                                               unsafeSwap)
@@ -23,21 +23,22 @@ import           Prelude                     hiding (length)
 import           Sorting.Sorting
 
 -- | Quicksort with 3-way partitioning
-sortBy' :: MVector v a => (a -> a -> Ordering) -> v s a -> ST s ()
+sortBy' :: (PrimMonad m, MVector v a)
+        => (a -> a -> Ordering) -> v (PrimState m) a -> m ()
 sortBy' cmp vec = do
   let hi = length vec - 1
   qSort 0 hi
     where
       qSort l h = when (l < h) $ do
-        ltRef <- newSTRef l
-        iRef  <- newSTRef (l + 1)
-        gtRef <- newSTRef h
+        ltRef <- newMutVar l
+        iRef  <- newMutVar (l + 1)
+        gtRef <- newMutVar h
         v <- unsafeRead vec l
 
         let go = do
-              i     <- readSTRef iRef
-              lt    <- readSTRef ltRef
-              gt    <- readSTRef gtRef
+              i     <- readMutVar iRef
+              lt    <- readMutVar ltRef
+              gt    <- readMutVar gtRef
               itemI <- unsafeRead vec (min i h)
               when (i <= gt) $ do
                 if | itemI `cmp` v == LT -> unsafeSwap vec lt i >> ltRef += 1 >> iRef += 1
@@ -46,12 +47,12 @@ sortBy' cmp vec = do
                 go
 
         go
-        lt <- readSTRef ltRef
-        gt <- readSTRef gtRef
+        lt <- readMutVar ltRef
+        gt <- readMutVar gtRef
         qSort l (lt - 1)
         qSort (gt + 1) h
 
-sort' :: (Ord a, MVector v a) => v s a -> ST s ()
+sort' :: (PrimMonad m, Ord a, MVector v a) => v (PrimState m) a -> m ()
 sort' = sortBy' compare
 
 sortBy :: (Vector v a) => (a -> a -> Ordering) -> v a -> v a

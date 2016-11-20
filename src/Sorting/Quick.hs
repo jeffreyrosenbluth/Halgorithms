@@ -1,15 +1,16 @@
 {-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE FlexibleInstances #-}
 ----------------------------------------------------------
 -- |
--- 2 Sorting
--- Selection sort, Inserting sort, Shellsort, Megesort,
--- Bottum up mergesort and QuickSort.
--- Transcription of "http://algs4.cs.princeton.edu".
--- (c) 2014 Jeffrey Rosenbluth
-----------------------------------------------------------
-
-module Sorting.Quick where
+-- Quicksort (in place).
+-- (c) 2014-16 Jeffrey Rosenbluth
+----------------------------------------------------------s
+module Sorting.Quick
+  ( sortBy'
+  , sortBy
+  , sort'
+  , sort
+  , sortOn
+  ) where
 
 import           Common.References
 import           Sorting.Sorting
@@ -20,9 +21,9 @@ import           Data.Vector.Generic         (Vector)
 import           Data.Vector.Generic.Mutable (MVector, unsafeRead, unsafeSwap, length)
 import           Prelude                     hiding (length)
 
--- | Partition into 'vec[lo..i-1], a[+1..hi]'. For quicksort, Algorithm 2.5.
+-- | Partition into 'vec[lo..i-1], a[+1..hi]'.
 partition :: (PrimMonad m, MVector v a )
-          => (a -> a -> Ordering) -> v (PrimState m) a -> Int -> Int -> m Int
+          => Comparing a -> v (PrimState m) a -> Int -> Int -> m Int
 partition cmp vec lo hi = do
   iRef <- newMutVar lo
   jRef <- newMutVar (hi + 1)
@@ -48,7 +49,7 @@ partition cmp vec lo hi = do
 
 -- | Quicksort, Algorithm 2.5. For mutable vectors.
 sortBy' :: (PrimMonad m, MVector v a)
-        => (a -> a -> Ordering) -> v (PrimState m) a -> m ()
+        => Comparing a -> v (PrimState m) a -> m ()
 sortBy' cmp vec =   qSort 0 $ length vec - 1
   where
     qSort l h = when (l < h) $ do
@@ -59,7 +60,7 @@ sortBy' cmp vec =   qSort 0 $ length vec - 1
 sort' :: (PrimMonad m, Ord a, MVector v a) => v (PrimState m) a -> m ()
 sort' = sortBy' compare
 
-sortBy :: (Vector v a) => (a -> a -> Ordering) -> v a -> v a
+sortBy :: (Vector v a) => Comparing a -> v a -> v a
 sortBy = toImmutable sortBy'
 
 sort :: (Ord a, Vector v a) => v a -> v a

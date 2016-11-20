@@ -1,14 +1,16 @@
 {-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE FlexibleInstances #-}
 ----------------------------------------------------------
 -- |
--- 2 Sorting
 -- Selection sort.
--- Transcription of "http://algs4.cs.princeton.edu".
 -- (c) 2014-16 Jeffrey Rosenbluth
 ----------------------------------------------------------
-
-module Sorting.Selection where
+module Sorting.Selection
+  ( sortBy'
+  , sortBy
+  , sort'
+  , sort
+  , sortOn
+  ) where
 
 import           Common.References
 import           Control.Monad
@@ -20,9 +22,9 @@ import           Data.Vector.Generic.Mutable (MVector, length, unsafeRead,
 import           Prelude                     hiding (length)
 import           Sorting.Sorting
 
--- | Selection sort, Algorithm 2.1. For mutable vectors.
+-- | Selection sort for mutable vectors.
 sortBy' :: (PrimMonad m, MVector v a)
-        => (a -> a -> Ordering) -> v (PrimState m) a -> m ()
+        => Comparing a -> v (PrimState m) a -> m ()
 sortBy' cmp vec = do
   let n = length vec
   infRef <- newMutVar 0
@@ -38,7 +40,7 @@ sortBy' cmp vec = do
 sort' :: (PrimMonad m, Ord a, MVector v a) => v (PrimState m) a -> m ()
 sort' = sortBy' compare
 
-sortBy :: (Vector v a) => (a -> a -> Ordering) -> v a -> v a
+sortBy :: (Vector v a) => Comparing a -> v a -> v a
 sortBy = toImmutable sortBy'
 
 sort :: (Ord a, Vector v a) => v a -> v a

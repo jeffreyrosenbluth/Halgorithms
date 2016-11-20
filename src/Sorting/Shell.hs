@@ -3,13 +3,16 @@
 {-# LANGUAGE MultiWayIf        #-}
 ----------------------------------------------------------
 -- |
--- 2 Sorting
 -- Shellsort.
--- Transcription of "http://algs4.cs.princeton.edu".
 -- (c) 2014-16 Jeffrey Rosenbluth
 ----------------------------------------------------------
-
-module Sorting.Shell where
+module Sorting.Shell
+  ( sortBy'
+  , sortBy
+  , sort'
+  , sort
+  , sortOn
+  ) where
 
 import           Common.References
 import           Control.Monad
@@ -21,7 +24,7 @@ import           Prelude                     hiding (length)
 import           Sorting.Sorting
 
 
--- | Shellsort, Algorithm 2.3. For mutable vectors.
+-- | Shellsort for mutable vectors.
 sortBy' :: (PrimMonad m, MVector v a)
         => (a -> a -> Ordering) -> v (PrimState m) a -> m ()
 sortBy' cmp vec = do

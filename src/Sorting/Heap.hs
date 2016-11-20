@@ -1,24 +1,24 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiWayIf       #-}
-
 ----------------------------------------------------------
 -- |
--- 2 Sorting
--- Selection sort, Inserting sort, Shellsort, Megesort,
--- Bottum up mergesort and QuickSort.
--- Transcription of "http://algs4.cs.princeton.edu".
--- (c) 2014 Jeffrey Rosenbluth
+-- Heap sort.
+-- (c) 2014-16 Jeffrey Rosenbluth
 ----------------------------------------------------------
 
-module Sorting.Heap where
-
-import           Common.References
+module Sorting.Heap
+  ( sortBy'
+  , sortBy
+  , sort'
+  , sort
+  , sortOn
+  ) where
 
 import           Control.Monad
 import           Control.Monad.Primitive
 import           Data.Primitive.MutVar
 import           Data.Vector.Generic         (Vector)
-import           Data.Vector.Generic.Mutable (MVector, unsafeRead, swap, length)
+import           Data.Vector.Generic.Mutable (MVector, unsafeRead, unsafeSwap
+                                             ,length)
 import           Prelude                     hiding (read, length)
 import           Sorting.Sorting
 
@@ -36,9 +36,10 @@ sink cmp vec l h = go l h
         c <- unsafeRead vec k
         d <- unsafeRead vec j'
         when (c `cmp` d == LT) $ do
-          swap vec k j'
+          unsafeSwap vec k j'
           go j' n
 
+-- | Heap sort for mutable vectors.
 sortBy' :: (PrimMonad m, MVector v a)
      => (a -> a -> Ordering) -> v (PrimState m) a -> m ()
 sortBy' cmp vec = do
@@ -49,7 +50,7 @@ sortBy' cmp vec = do
     where
       go q = when (q > 0) $ do
         let q1 = q - 1
-        swap vec 0 q
+        unsafeSwap vec 0 q
         sink cmp vec 0 q1
         go q1
 

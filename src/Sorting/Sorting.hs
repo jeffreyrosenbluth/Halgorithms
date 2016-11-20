@@ -17,7 +17,9 @@ import           Data.Vector.Generic.Mutable (MVector, unsafeRead, unsafeWrite, 
 type Sorter = forall v s a. MVector v a
            => (a -> a -> Ordering) -> v s a -> ST s ()
 
-toImmutable :: (Vector v a) => Sorter -> (a -> a -> Ordering) -> v a -> v a
+type Comparing a = a -> a -> Ordering
+
+toImmutable :: (Vector v a) => Sorter -> Comparing a -> v a -> v a
 toImmutable sorter cmp arr = runST $ do
   vec <- unsafeThaw arr
   sorter cmp vec

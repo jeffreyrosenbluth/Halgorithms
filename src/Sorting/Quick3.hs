@@ -1,16 +1,17 @@
 {-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiWayIf        #-}
 ----------------------------------------------------------
 -- |
--- 2 Sorting
--- Selection sort, Inserting sort, Shellsort, Megesort,
--- Bottum up mergesort and QuickSort.
--- Transcription of "http://algs4.cs.princeton.edu".
--- (c) 2014 Jeffrey Rosenbluth
+-- 3 Way QuickSort.
+-- (c) 2014-16 Jeffrey Rosenbluth
 ----------------------------------------------------------
-
-module Sorting.Quick3 where
+module Sorting.Quick3
+  ( sortBy'
+  , sortBy
+  , sort'
+  , sort
+  , sortOn
+  ) where
 
 import           Common.References
 import           Control.Monad               (when)
@@ -24,7 +25,7 @@ import           Sorting.Sorting
 
 -- | Quicksort with 3-way partitioning
 sortBy' :: (PrimMonad m, MVector v a)
-        => (a -> a -> Ordering) -> v (PrimState m) a -> m ()
+        => Comparing a -> v (PrimState m) a -> m ()
 sortBy' cmp vec = do
   let hi = length vec - 1
   qSort 0 hi
@@ -55,7 +56,7 @@ sortBy' cmp vec = do
 sort' :: (PrimMonad m, Ord a, MVector v a) => v (PrimState m) a -> m ()
 sort' = sortBy' compare
 
-sortBy :: (Vector v a) => (a -> a -> Ordering) -> v a -> v a
+sortBy :: (Vector v a) => Comparing a -> v a -> v a
 sortBy = toImmutable sortBy'
 
 sort :: (Ord a, Vector v a) => v a -> v a

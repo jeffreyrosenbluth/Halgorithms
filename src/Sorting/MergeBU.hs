@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE FlexibleInstances #-}
 ----------------------------------------------------------
 -- |
 -- 2 Sorting
@@ -8,8 +7,13 @@
 -- Transcription of "http://algs4.cs.princeton.edu".
 -- (c) 2014 Jeffrey Rosenbluth
 ----------------------------------------------------------
-
-module Sorting.MergeBU where
+module Sorting.MergeBU
+  ( sortBy'
+  , sortBy
+  , sort'
+  , sort
+  , sortOn
+  ) where
 
 import           Common.References
 import           Sorting.Sorting
@@ -21,7 +25,7 @@ import           Prelude                     hiding (length)
 
 -- | Bottom-up mergesort. For mutable vectors
 sortBy' :: (PrimMonad m, MVector v a)
-        => (a -> a -> Ordering) -> v (PrimState m) a -> m ()
+        => Comparing a -> v (PrimState m) a -> m ()
 sortBy' cmp vec = do
   let hi = length vec
   -- Do log hi passes of pairwise merges, sz: subarray size, i:  subarray index.
@@ -32,7 +36,7 @@ sortBy' cmp vec = do
 sort' :: (PrimMonad m, Ord a, MVector v a) => v (PrimState m) a -> m ()
 sort' = sortBy' compare
 
-sortBy :: (Vector v a) => (a -> a -> Ordering) -> v a -> v a
+sortBy :: (Vector v a) => Comparing a -> v a -> v a
 sortBy = toImmutable sortBy'
 
 sort :: (Ord a, Vector v a) => v a -> v a
